@@ -1,0 +1,88 @@
+erDiagram
+    costumer {
+        INTEGER costumer_id PK
+        VARCHAR name
+        VARCHAR last_name
+        DATE birth_date
+        VARCHAR email
+        VARCHAR address
+        INTEGER id_iso_code FK
+        INTEGER id_card_number FK
+    }
+
+    credit_card {
+        INTEGER card_number PK
+        DATE issue_date
+        DATE expiry_date
+        VARCHAR status
+        VARCHAR id_franchise FK
+    }
+
+    franchise {
+        INTEGER franchise_id PK
+        VARCHAR franchise_name
+        VARCHAR issuer_bank
+        VARCHAR id_iso_code FK
+        INTEGER id_bank_code FK
+    }
+
+    issuing_entity {
+        INTEGER bank_code PK
+        VARCHAR bank_name
+        INTEGER phone
+        BOOLEAN international
+        VARCHAR id_iso_code FK
+    }
+
+    country {
+        VARCHAR iso_code_id PK
+        VARCHAR country_name
+        VARCHAR region
+        VARCHAR currency
+        VARCHAR id_region FK
+    }
+
+    region {
+        INTEGER region_id PK
+        VARCHAR name
+    }
+
+    commerce {
+        INTEGER id PK
+        VARCHAR merchant_name
+        VARCHAR category
+        VARCHAR city
+        VARCHAR latitude
+        VARCHAR longitude
+        VARCHAR id_iso_code FK
+    }
+
+    Transaction {
+        INTEGER transaction_id PK
+        INTEGER amount
+        VARCHAR currency
+        DATETIME date_time
+        VARCHAR channel
+        VARCHAR status
+        VARCHAR device
+        INTEGER id_card_number FK
+        INTEGER id FK
+        INTEGER id_pay FK
+    }
+
+    pay_method {
+        INTEGER pay_id PK
+        VARCHAR method_type
+    }
+
+    costumer ||--|| country : "belongs to"
+    costumer }o--|| credit_card : "uses"
+    credit_card }o--|| franchise : "has"
+    franchise ||--|| country : "based in"
+    franchise ||--|| issuing_entity : "issued by"
+    issuing_entity ||--|| country : "located in"
+    country }o--|| region : "is in"
+    commerce }o--|| country : "located in"
+    Transaction }o--|| credit_card : "uses"
+    Transaction }o--|| commerce : "at"
+    Transaction }o--|| pay_method : "paid with"
