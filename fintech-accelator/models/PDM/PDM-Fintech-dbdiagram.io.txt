@@ -1,0 +1,87 @@
+Table costumer {
+  costumer_id INTEGER [pk, not null]
+  name VARCHAR(30) [not null]
+  last_name VARCHAR(30) [not null]
+  birth_date DATE [not null]
+  email VARCHAR(30) [not null]
+  address VARCHAR(30) [not null]
+  id_iso_code INTEGER [not null]
+  id_card_number INTEGER [not null]
+}
+
+Table credit_card {
+  card_number INTEGER [pk, not null]
+  issue_date DATE [not null]
+  expiry_date DATE [not null]
+  status VARCHAR(30) [not null]
+  id_franchise VARCHAR(30) [not null]
+}
+
+Table franchise {
+  franchise_id INTEGER [pk, not null]
+  franchise_name VARCHAR(30) [not null]
+  issuer_bank VARCHAR(30) [not null]
+  id_iso_code VARCHAR(5) [not null]
+  id_bank_code INTEGER [not null]
+}
+
+Table issuing_entity {
+  bank_code INTEGER [pk, not null]
+  bank_name VARCHAR(30) [not null]
+  phone INTEGER [not null]
+  international_op VARCHAR(30) [not null]
+  id_iso_code VARCHAR(5) [not null]
+}
+
+Table country {
+  iso_code_id VARCHAR(5) [pk, not null]
+  country_name VARCHAR(30) [not null]
+  region VARCHAR(30) [not null]
+  currency VARCHAR(30) [not null]
+  id_region VARCHAR(50) [not null]
+}
+
+Table region {
+  region_id INTEGER [pk, not null]
+  name VARCHAR(100) [not null]
+}
+
+Table commerce {
+  id INTEGER [pk, not null]
+  merchant_name VARCHAR(30) [not null]
+  category VARCHAR(30) [not null]
+  city VARCHAR(30) [not null]
+  latitude VARCHAR(30) [not null]
+  longitude VARCHAR(30) [not null]
+  id_iso_code VARCHAR(5) [not null]
+}
+
+Table Transaction {
+  transaction_id INTEGER [pk, not null]
+  amount INTEGER [not null]
+  currency VARCHAR(30) [not null]
+  date_time DATETIME [not null]
+  channel VARCHAR(30)
+  status VARCHAR(30) [not null]
+  device VARCHAR(30) [not null]
+  id_card_number INTEGER [not null]
+  id INTEGER [not null]
+  id_pay INTEGER [not null]
+}
+
+Table pay_method {
+  pay_id INTEGER [pk, not null]
+  method_type VARCHAR(30) [not null]
+}
+
+Ref: costumer.id_iso_code > country.iso_code_id
+Ref: costumer.id_card_number > credit_card.card_number
+Ref: credit_card.id_franchise > franchise.franchise_id
+Ref: franchise.id_iso_code > country.iso_code_id
+Ref: franchise.id_bank_code > issuing_entity.bank_code
+Ref: issuing_entity.id_iso_code > country.iso_code_id
+Ref: country.id_region > region.region_id
+Ref: commerce.id_iso_code > country.iso_code_id
+Ref: Transaction.id_card_number > credit_card.card_number
+Ref: Transaction.id > commerce.id
+Ref: Transaction.id_pay > pay_method.pay_id
