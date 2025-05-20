@@ -1,0 +1,64 @@
+SET  
+Temperature: 0.5
+
+Create a Python class that represents a database table based on the following definition. The class must include:  
+
+1. **Class Structure**:  
+   - Class name matches the table name (in `PascalCase`).  
+   - Instance attributes corresponding to table columns (in `snake_case`).  
+   - Foreign keys (if any) must be manually specified by the user and handled as lists of valid referenced values.  
+
+2. **Data Generation with PyFaker**:  
+   - Use the `faker` library to generate realistic fake data based on column types (e.g., `name` for VARCHAR, `date` for DATE, `random_number` for INT).  
+   - For foreign keys, randomly select values from user-provided lists.  
+   - **Localization Support**:  
+     - Use a **variability percentage** (0–1) to determine the number of locales to sample from the provided list (e.g., 0.5 → ~20 locales, 0.08 → 2–3 locales).  
+     - Dynamically assign locales to records based on the variability argument.  
+   - **Seed Argument**: Ensure reproducibility by accepting a seed value for random generation.  
+
+3. **CLI Arguments via `argparse`**:  
+   - `--records`: Number of records to generate (required).  
+   - `--seed`: Seed for random data reproducibility (optional, default: `42`).  
+   - `--variability`: Locale distribution variability (0–1, default: `0.3`).  
+
+4. **SQL Export**:  
+   - Generate a file named `FINTECH-<TABLE_NAME>.sql` with valid `INSERT` statements.  
+   - Escape strings and format SQL compliantly (e.g., single quotes, NULL handling).  
+
+### **User Input Example**:  
+- Table: `user_accounts`  
+- Columns: `id INT PRIMARY KEY, username VARCHAR(50), email VARCHAR(100), registration_date DATE, country_id INT`  
+- Foreign Key: `country_id` references `countries(id)` (valid values: `[1, 2, 3]`).  
+
+### **Expected Output**:  
+1. Python class `UserAccounts` with attributes `id`, `username`, `email`, `registration_date`, `country_id`.  
+2. Fake data generated with:  
+   - Localized providers (e.g., `en_US`, `es_MX`) based on variability.  
+   - Foreign key values constrained to the provided list.  
+3. SQL file (`FINTECH-user_accounts.sql`) with statements like:  
+   ```sql
+   INSERT INTO user_accounts (id, username, email, registration_date, country_id)  
+   VALUES (1, 'juan_perez', 'juan@example.com', '2023-10-15', 2);  
+   ```  
+
+### **Code Requirements**:  
+- Use `argparse` to parse `--records`, `--seed`, and `--variability`.  
+- Implement a `generate_fake_data()` method that:  
+  - Selects locales dynamically (e.g., higher variability → more locales).  
+  - Uses the seed for reproducibility.  
+- Include a `to_sql()` method for SQL export.  
+
+### **Example Command**:  
+```bash
+python script.py --records 100 --seed 123 --variability 0.6
+```  
+
+---
+
+### **Notes**:  
+- **Install Dependencies**:  
+  ```bash
+  pip install faker argparse
+  ```  
+- **Locale Handling**: For variability `V`, the number of locales is `ceil(V * len(locale_list))`.  
+- **Foreign Keys**: Validate values against the provided list before SQL generation.  
