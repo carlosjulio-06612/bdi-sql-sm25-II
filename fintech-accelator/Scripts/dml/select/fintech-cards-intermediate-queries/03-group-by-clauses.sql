@@ -58,25 +58,39 @@ con más de 5% de rechazos y al menos 100 intentos de transacción.
 **/
 
 SELECT 
-    fr.name AS franchise,
-    co.name AS country,
-    COUNT(*) FILTER (WHERE tr.status = 'Rejected') * 100.0 / COUNT(*) AS rejection_rate,
-    COUNT(*) AS total_attempts
-
-FROM fintech.transactions AS tr
-INNER JOIN fintech.credit_cards AS cc
-    ON tr.card_id = cc.card_id
-INNER JOIN fintech.franchises AS fr
-    ON cc.franchise_id = fr.franchise_id
-INNER JOIN fintech.merchant_locations AS ml
-    ON tr.location_id = ml.location_id
-INNER JOIN fintech.countries AS co
-    ON ml.country_code = co.country_code
-GROUP BY fr.name, co.name
-HAVING COUNT(*) >= 100 AND 
-       COUNT(*) FILTER (WHERE tr.status = 'Rejected') * 100.0 / COUNT(*) > 5
+    total.franchise,
+    total.country,
+    rejected.rejected_count * 100.0 / total.total_count AS rejection_rate,
+    total.total_count AS total_attempts
+FROM (
+    SELECT 
+        fr.name AS franchise,
+        co.name AS country,
+        COUNT(*) AS total_count
+    FROM fintech.transactions tr
+    INNER JOIN fintech.credit_cards cc ON tr.card_id = cc.card_id
+    INNER JOIN fintech.franchises fr ON cc.franchise_id = fr.franchise_id
+    INNER JOIN fintech.merchant_locations ml ON tr.location_id = ml.location_id
+    INNER JOIN fintech.countries co ON ml.country_code = co.country_code
+    GROUP BY fr.name, co.name
+) AS total
+INNER JOIN (
+    SELECT 
+        fr.name AS franchise,
+        co.name AS country,
+        COUNT(*) AS rejected_count
+    FROM fintech.transactions tr
+    INNER JOIN fintech.credit_cards cc ON tr.card_id = cc.card_id
+    INNER JOIN fintech.franchises fr ON cc.franchise_id = fr.franchise_id
+    INNER JOIN fintech.merchant_locations ml ON tr.location_id = ml.location_id
+    INNER JOIN fintech.countries co ON ml.country_code = co.country_code
+    WHERE tr.status = 'Rejected'
+    GROUP BY fr.name, co.name
+) AS rejected
+ON total.franchise = rejected.franchise AND total.country = rejected.country
+WHERE total.total_count >= 100
+  AND rejected.rejected_count * 100.0 / total.total_count > 5
 ORDER BY rejection_rate DESC
-LIMIT 20;
 
 
 /**
@@ -86,56 +100,99 @@ transacciones, filtrando solo aquellas
 combinaciones que representen más del 20% .
 del total de transacciones de esa ciudad.
 **/
-WITH city_totals AS (
-    SELECT 
-        city,
-        COUNT(*) AS total_transactions
-    FROM fintech.transactions tr
-    INNER JOIN fintech.merchant_locations ml ON tr.location_id = ml.location_id
-    GROUP BY city
-)
 SELECT 
     pm.name AS payment_method,
     ml.city,
     co.name AS country,
     COUNT(*) AS method_count,
-    ROUND(COUNT(*) * 100.0 / ct.total_transactions, 2) AS method_percentage
+    ROUND(COUNT(*) * 100.0 / city_total.total_count, 2) AS method_percentage
 FROM fintech.transactions tr
 INNER JOIN fintech.payment_methods pm ON tr.method_id = pm.method_id
 INNER JOIN fintech.merchant_locations ml ON tr.location_id = ml.location_id
 INNER JOIN fintech.countries co ON ml.country_code = co.country_code
-INNER JOIN city_totals ct ON ml.city = ct.city
-GROUP BY pm.name, ml.city, co.name, ct.total_transactions
-HAVING COUNT(*) * 1.0 / ct.total_transactions > 0.20
+INNER JOIN (
+    SELECT 
+        ml.city,
+        COUNT(*) AS total_count
+    FROM fintech.transactions tr2
+    INNER JOIN fintech.merchant_locations ml ON tr2.location_id = ml.location_id
+    GROUP BY ml.city
+) AS city_total ON ml.city = city_total.city
+GROUP BY pm.name, ml.city, co.name, city_total.total_count
+HAVING COUNT(*) * 1.0 / city_total.total_count > 0.20
 ORDER BY ml.city, method_percentage DESC
-LIMIT 20;
-
+LIMIT 5;
 /**
 5. Analizar el comportamiento de compra por género y rango de edad, 
 mostrando el total gastado, promedio por transacción y número de operaciones 
 completadas, incluyendo solo los grupos demográficos 
 que tengan al menos 30 clientes activos.
 **/
-
+-- Grupo 18-25
 SELECT 
     cl.gender,
-    CASE
-        WHEN DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) BETWEEN 18 AND 25 THEN '18-25'
-        WHEN DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) BETWEEN 26 AND 35 THEN '26-35'
-        WHEN DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) BETWEEN 36 AND 50 THEN '36-50'
-        WHEN DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) > 50 THEN '50+'
-        ELSE 'Unknown'
-    END AS age_group,
-
+    '18-25' AS age_group,
     COUNT(DISTINCT cl.client_id) AS clients_in_group,
     COUNT(tr.transaction_id) AS total_transactions,
     SUM(tr.amount) AS total_spent,
     AVG(tr.amount) AS avg_per_transaction
+FROM fintech.clients cl
+INNER JOIN fintech.credit_cards cc ON cl.client_id = cc.client_id
+INNER JOIN fintech.transactions tr ON cc.card_id = tr.card_id
+WHERE DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) >= 18
+  AND DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) <= 25
+GROUP BY cl.gender
+HAVING COUNT(DISTINCT cl.client_id) >= 30
 
-FROM fintech.clients AS cl
-INNER JOIN fintech.credit_cards AS cc 
-    ON cl.client_id = cc.client_id
-INNER JOIN fintech.transactions AS tr 
-    ON cc.card_id = tr.card_id
-GROUP BY cl.gender, age_group
-ORDER BY clients_in_group DESC;
+UNION ALL
+
+-- Grupo 26-35
+SELECT 
+    cl.gender,
+    '26-35' AS age_group,
+    COUNT(DISTINCT cl.client_id),
+    COUNT(tr.transaction_id),
+    SUM(tr.amount),
+    AVG(tr.amount)
+FROM fintech.clients cl
+INNER JOIN fintech.credit_cards cc ON cl.client_id = cc.client_id
+INNER JOIN fintech.transactions tr ON cc.card_id = tr.card_id
+WHERE DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) >= 26
+  AND DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) <= 35
+GROUP BY cl.gender
+HAVING COUNT(DISTINCT cl.client_id) >= 30
+
+UNION ALL
+
+-- Grupo 36-50
+SELECT 
+    cl.gender,
+    '36-50' AS age_group,
+    COUNT(DISTINCT cl.client_id),
+    COUNT(tr.transaction_id),
+    SUM(tr.amount),
+    AVG(tr.amount)
+FROM fintech.clients cl
+INNER JOIN fintech.credit_cards cc ON cl.client_id = cc.client_id
+INNER JOIN fintech.transactions tr ON cc.card_id = tr.card_id
+WHERE DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) >= 36
+  AND DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) <= 50
+GROUP BY cl.gender
+HAVING COUNT(DISTINCT cl.client_id) >= 30
+
+UNION ALL
+
+-- Grupo 50+
+SELECT 
+    cl.gender,
+    '50+' AS age_group,
+    COUNT(DISTINCT cl.client_id),
+    COUNT(tr.transaction_id),
+    SUM(tr.amount),
+    AVG(tr.amount)
+FROM fintech.clients cl
+INNER JOIN fintech.credit_cards cc ON cl.client_id = cc.client_id
+INNER JOIN fintech.transactions tr ON cc.card_id = tr.card_id
+WHERE DATE_PART('year', AGE(CURRENT_DATE, cl.birth_date)) > 50
+GROUP BY cl.gender
+HAVING COUNT(DISTINCT cl.client_id) >= 30;
